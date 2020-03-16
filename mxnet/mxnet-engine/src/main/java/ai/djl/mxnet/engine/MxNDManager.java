@@ -15,6 +15,7 @@ package ai.djl.mxnet.engine;
 import ai.djl.Device;
 import ai.djl.engine.Engine;
 import ai.djl.engine.EngineException;
+import ai.djl.mxnet.javacpp.NDArrayHandle;
 import ai.djl.mxnet.jna.JnaUtils;
 import ai.djl.ndarray.BaseNDManager;
 import ai.djl.ndarray.NDArray;
@@ -24,7 +25,6 @@ import ai.djl.ndarray.types.DataType;
 import ai.djl.ndarray.types.Shape;
 import ai.djl.ndarray.types.SparseFormat;
 import ai.djl.util.PairList;
-import com.sun.jna.Pointer;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -64,7 +64,7 @@ public class MxNDManager extends BaseNDManager {
      * @param handle the array's native memory pointer
      * @return the created array
      */
-    public MxNDArray create(Pointer handle) {
+    public MxNDArray create(NDArrayHandle handle) {
         MxNDArray array = new MxNDArray(this, handle);
         attach(array.getUid(), array);
         return array;
@@ -77,7 +77,7 @@ public class MxNDManager extends BaseNDManager {
      * @param fmt the sparse format to use
      * @return the created array
      */
-    public MxSparseNDArray create(Pointer handle, SparseFormat fmt) {
+    public MxSparseNDArray create(NDArrayHandle handle, SparseFormat fmt) {
         MxSparseNDArray array = new MxSparseNDArray(this, handle, fmt);
         attach(array.getUid(), array);
         return array;
@@ -87,7 +87,8 @@ public class MxNDManager extends BaseNDManager {
     @Override
     public MxNDArray create(Shape shape, DataType dataType, Device dev) {
         dev = Device.defaultIfNull(dev, device);
-        Pointer handle = JnaUtils.createNdArray(dev, shape, dataType, shape.dimension(), false);
+        NDArrayHandle handle =
+                JnaUtils.createNdArray(dev, shape, dataType, shape.dimension(), false);
         MxNDArray array = new MxNDArray(this, handle, dev, shape, dataType);
         attach(array.getUid(), array);
         return array;
@@ -105,7 +106,7 @@ public class MxNDManager extends BaseNDManager {
         indptrNd.set(indptr);
         MxNDArray indicesNd = create(new Shape(indices.length), DataType.INT64, dev);
         indicesNd.set(indices);
-        Pointer handle =
+        NDArrayHandle handle =
                 JnaUtils.createSparseNdArray(
                         fmt,
                         dev,
@@ -133,7 +134,7 @@ public class MxNDManager extends BaseNDManager {
         DataType dataType = DataType.fromBuffer(data);
         MxNDArray indicesNd = create(new Shape(indices.length), DataType.INT64, dev);
         indicesNd.set(indices);
-        Pointer handle =
+        NDArrayHandle handle =
                 JnaUtils.createSparseNdArray(
                         fmt,
                         dev,

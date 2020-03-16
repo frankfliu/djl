@@ -8,6 +8,7 @@ repositories {
 
 dependencies {
     api project(":api")
+    api project(":mxnet:javacpp")
 
     testRuntimeOnly "ai.djl.mxnet:mxnet-native-auto:${mxnet_version}-SNAPSHOT"
     testImplementation project(":basicdataset")
@@ -20,40 +21,6 @@ dependencies {
     testImplementation "org.slf4j:slf4j-simple:${slf4j_version}"
     testImplementation "org.powermock:powermock-module-testng:${powermock_version}"
     testImplementation "org.powermock:powermock-api-mockito2:${powermock_version}"
-}
-
-sourceSets {
-    main {
-        java {
-            srcDirs = ['src/main/java', 'build/generated-src']
-        }
-    }
-}
-
-checkstyleMain.source = 'src/main/java'
-pmdMain.source = 'src/main/java'
-
-task jnarator(dependsOn: ":mxnet:jnarator:jar") {
-    doLast {
-        File jnaGenerator = project(":mxnet:jnarator").jar.outputs.files.singleFile
-        javaexec {
-            main = "-jar"
-            args = [
-                    jnaGenerator.absolutePath,
-                    "-l",
-                    "mxnet",
-                    "-p",
-                    "ai.djl.mxnet.jna",
-                    "-o",
-                    "${project.buildDir}/generated-src",
-                    "-m",
-                    "${project.projectDir}/src/main/jna/mapping.properties",
-                    "-f",
-                    "src/main/include/mxnet/c_api.h",
-                    "src/main/include/nnvm/c_api.h"
-            ]
-        }
-    }
 }
 
 test {
@@ -94,8 +61,6 @@ task checkHeaderFile() {
     def nnvmUrl = "https://raw.githubusercontent.com/apache/incubator-tvm/${hash}"
     checkForUpdate("nnvm/c_api.h", "${nnvmUrl}/nnvm/include/nnvm/c_api.h")
 }
-
-compileJava.dependsOn(jnarator)
 
 publishing {
     publications {

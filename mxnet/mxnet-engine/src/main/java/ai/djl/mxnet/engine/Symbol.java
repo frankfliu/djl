@@ -12,12 +12,12 @@
  */
 package ai.djl.mxnet.engine;
 
+import ai.djl.mxnet.javacpp.SymbolHandle;
 import ai.djl.mxnet.jna.JnaUtils;
 import ai.djl.mxnet.jna.NativeResource;
 import ai.djl.ndarray.types.Shape;
 import ai.djl.util.PairList;
 import ai.djl.util.Utils;
-import com.sun.jna.Pointer;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -36,10 +36,7 @@ import java.util.stream.Collectors;
  */
 public class Symbol extends NativeResource {
 
-    //    private String[] argParams;
-    //    private String[] auxParams;
     private String[] outputs;
-    //    private List<Integer> outputLayouts;
     private MxNDManager manager;
 
     /**
@@ -48,12 +45,10 @@ public class Symbol extends NativeResource {
      * @param manager the manager to attach the symbol to
      * @param pointer the symbol's native data location
      */
-    Symbol(MxNDManager manager, Pointer pointer) {
+    Symbol(MxNDManager manager, SymbolHandle pointer) {
         super(pointer);
         this.manager = manager;
         manager.attach(getUid(), this);
-        //        argParams = JnaUtils.listSymbolArguments(getHandle());
-        //        auxParams = JnaUtils.listSymbolAuxiliaryStates(getHandle());
     }
 
     /**
@@ -64,7 +59,7 @@ public class Symbol extends NativeResource {
      * @return the new symbol
      */
     public static Symbol load(MxNDManager manager, String path) {
-        Pointer pointer = JnaUtils.createSymbolFromFile(path);
+        SymbolHandle pointer = JnaUtils.createSymbolFromFile(path);
         return new Symbol(manager, pointer);
     }
 
@@ -111,30 +106,6 @@ public class Symbol extends NativeResource {
         return JnaUtils.listSymbolOutputs(getInternals().getHandle());
     }
 
-    /*
-    public List<Integer> getOutputLayouts() {
-        if (outputLayouts == null) {
-            outputLayouts = new ArrayList<>();
-            for (String argName : getArgParams()) {
-                try (Symbol symbol = get(argName)) {
-                    Layout layout = Layout.fromValue(symbol.getAttribute("__layout__"));
-                    outputLayouts.add(DataDesc.getBatchAxis(layout));
-                }
-            }
-        }
-        return outputLayouts;
-    }
-
-    public String getAttribute(String key) {
-        return JnaUtils.getSymbolAttr(getHandle(), key);
-    }
-
-    public PairList<String, String> getAttributes() {
-        return JnaUtils.listSymbolAttr(getHandle());
-    }
-
-     */
-
     /**
      * Copies the symbol.
      *
@@ -151,7 +122,7 @@ public class Symbol extends NativeResource {
      * @return the symbol output as a new symbol
      */
     public Symbol get(int index) {
-        Pointer pointer = JnaUtils.getSymbolOutput(getInternals().getHandle(), index);
+        SymbolHandle pointer = JnaUtils.getSymbolOutput(getInternals().getHandle(), index);
         return new Symbol(manager, pointer);
     }
 
@@ -177,7 +148,7 @@ public class Symbol extends NativeResource {
      * @return the symbol internals symbol
      */
     public Symbol getInternals() {
-        Pointer pointer = JnaUtils.getSymbolInternals(getHandle());
+        SymbolHandle pointer = JnaUtils.getSymbolInternals(getHandle());
         return new Symbol(manager, pointer);
     }
 
@@ -227,43 +198,10 @@ public class Symbol extends NativeResource {
         return shapesMap;
     }
 
-    /*
-
-    public String debugStr() {
-        return JnaUtils.getSymbolDebugString(getHandle());
+    @Override
+    public SymbolHandle getHandle() {
+        return (SymbolHandle) super.getHandle();
     }
-
-    public void setAttr(Map<String, String> attrs) {
-        for (Map.Entry<String, String> entry : attrs.entrySet()) {
-            JnaUtils.setSymbolAttr(getHandle(), entry.getKey(), entry.getValue());
-        }
-    }
-
-    public PairList<String, String> listAttr() {
-        return JnaUtils.listSymbolAttr(getHandle());
-    }
-
-    public PairList<String, String> attrMap() {
-        return JnaUtils.listSymbolAttr(getHandle());
-    }
-
-    public void save(String path) {
-        JnaUtils.saveSymbol(getHandle(), path);
-    }
-
-    public Symbol compose(String name, String[] keys) {
-        return new Symbol(manager, JnaUtils.compose(getHandle(), name, keys));
-    }
-
-    public void compose(String name, Map<String, String> symbols) {
-        JnaUtils.compose(getHandle(), name, symbols.values().toArray(JnaUtils.EMPTY_ARRAY));
-    }
-
-    public String toJson() {
-        return JnaUtils.symbolToJson(getHandle());
-    }
-
-     */
 
     /** {@inheritDoc} */
     @Override
@@ -274,7 +212,7 @@ public class Symbol extends NativeResource {
     /** {@inheritDoc} */
     @Override
     public void close() {
-        Pointer pointer = handle.getAndSet(null);
+        SymbolHandle pointer = (SymbolHandle) handle.getAndSet(null);
         if (pointer != null) {
             manager.detach(getUid());
             JnaUtils.freeSymbol(pointer);

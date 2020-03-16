@@ -12,10 +12,10 @@
  */
 package ai.djl.mxnet.engine;
 
+import ai.djl.mxnet.javacpp.NDArrayHandle;
 import ai.djl.ndarray.NDArray;
 import ai.djl.ndarray.index.NDIndex;
 import ai.djl.ndarray.types.SparseFormat;
-import com.sun.jna.Pointer;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 
@@ -38,7 +38,7 @@ public class MxSparseNDArray extends MxNDArray {
      * @param handle the pointer to the native memory of the MXNDArray
      * @param fmt the sparse format
      */
-    MxSparseNDArray(MxNDManager manager, Pointer handle, SparseFormat fmt) {
+    MxSparseNDArray(MxNDManager manager, NDArrayHandle handle, SparseFormat fmt) {
         super(manager, handle, fmt);
     }
 

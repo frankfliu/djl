@@ -13,15 +13,18 @@
 
 package ai.djl.mxnet.engine;
 
+import ai.djl.mxnet.javacpp.KVStoreHandle;
+import ai.djl.mxnet.javacpp.MXKVStoreStrUpdater;
+import ai.djl.mxnet.javacpp.NDArrayHandle;
 import ai.djl.mxnet.jna.JnaUtils;
-import ai.djl.mxnet.jna.MxnetLibrary;
 import ai.djl.mxnet.jna.NativeResource;
 import ai.djl.ndarray.NDArray;
 import ai.djl.ndarray.NDList;
 import ai.djl.training.ParameterServer;
 import ai.djl.training.optimizer.Optimizer;
-import com.sun.jna.Pointer;
 import java.util.Arrays;
+import org.bytedeco.javacpp.BytePointer;
+import org.bytedeco.javacpp.Pointer;
 
 /** {@code MxParameterServer} is the MXNet implementation of {@link ParameterServer}. */
 public class MxParameterServer extends NativeResource implements ParameterServer {
@@ -42,8 +45,8 @@ public class MxParameterServer extends NativeResource implements ParameterServer
     public void init(String parameterId, NDArray[] values) {
         String[] keys = new String[values.length];
         Arrays.fill(keys, parameterId);
-        NDList vals = new NDList(values);
-        JnaUtils.parameterStoreInit(getHandle(), values.length, keys, vals);
+        NDList ndList = new NDList(values);
+        JnaUtils.parameterStoreInit(getHandle(), values.length, keys, ndList);
     }
 
     /** {@inheritDoc} */
@@ -64,21 +67,26 @@ public class MxParameterServer extends NativeResource implements ParameterServer
         JnaUtils.parameterStorePull(getHandle(), weights.length, keys, vals, priority);
     }
 
-    private static Pointer createdKVStore() {
+    @Override
+    public KVStoreHandle getHandle() {
+        return (KVStoreHandle) super.getHandle();
+    }
+
+    private static KVStoreHandle createdKVStore() {
         return JnaUtils.parameterStoreCreate("device");
     }
 
     /** {@inheritDoc} */
     @Override
     public void close() {
-        Pointer pointer = handle.getAndSet(null);
+        KVStoreHandle pointer = (KVStoreHandle) handle.getAndSet(null);
         if (pointer != null) {
             JnaUtils.parameterStoreClose(pointer);
         }
     }
 
     /** A helper to wrap the optimizer so it can be called by the MXNet KVStore. */
-    private static final class OptimizerCallback implements MxnetLibrary.MXKVStoreStrUpdater {
+    private static final class OptimizerCallback extends MXKVStoreStrUpdater {
 
         private Optimizer optimizer;
 
@@ -88,7 +96,8 @@ public class MxParameterServer extends NativeResource implements ParameterServer
 
         /** {@inheritDoc} */
         @Override
-        public void apply(String parameterId, Pointer recv, Pointer local, Pointer handle) {
+        public void call(BytePointer key, NDArrayHandle recv, NDArrayHandle local, Pointer handle) {
+            String parameterId = JnaUtils.getStringValue(key);
             // updater callback arguments order is: index, gradient, weight.
             try (MxNDManager manager = MxNDManager.getSystemManager().newSubManager()) {
                 MxNDArray grad = manager.create(recv);

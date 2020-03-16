@@ -1,0 +1,119 @@
+import java.util.zip.GZIPInputStream
+
+dependencies {
+    api "org.bytedeco:javacpp:1.5.2"
+}
+
+def VERSION = "1.6.0"
+boolean isRelease = project.hasProperty("release") || project.hasProperty("staging")
+version = VERSION + (isRelease ? "" : "-SNAPSHOT")
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['src/main/java', 'build/generated-src']
+        }
+    }
+}
+
+compileJava {
+    options.compilerArgs = ["-proc:none"]
+}
+
+jar {
+    doFirst {
+        def versionName = String.format("${version}-%s", new Date().format('yyyyMMdd'))
+        String osName = System.getProperty("os.name")
+        String osPrefix;
+        if (osName.startsWith("Win")) {
+            osPrefix = "win-x86_64"
+        } else if (osName.startsWith("Mac")) {
+            osPrefix = "osx-x86_64"
+        } else if (osName.startsWith("Linux")) {
+            osPrefix = "linux-x86_64"
+        } else {
+            throw new GradleException("Unsupported os: " + osName)
+        }
+
+        def dir = file("${projectDir}/build/classes/java/main/native/lib/${osPrefix}")
+        dir.mkdirs();
+        def propFile = new File(dir, "jnimxnet.properties")
+        propFile.text = "version=${versionName}\n"
+
+        def libjniName = System.mapLibraryName("jnimxnet")
+        copy {
+            from("${projectDir}/build/generated-src/${libjniName}")
+            into("${dir.getAbsolutePath()}")
+        }
+    }
+}
+
+checkstyleMain.enabled = false
+pmdMain.enabled = false
+//spotbugsMain.enabled = false
+javadoc.enabled = false
+
+jar.finalizedBy("compileCpp")
+compileJava.dependsOn("parseCpp")
+
+task compileCpp(dependsOn: compileJava) {
+    doLast {
+        def libjnimxnet = file("build/generated-src/${System.mapLibraryName("jnimxnet")}")
+        if (libjnimxnet.exists()) {
+            return;
+        }
+        javaexec {
+            main "org.bytedeco.javacpp.tools.Builder"
+            classpath configurations.compileClasspath
+            workingDir "${projectDir}"
+            args = [
+                    "-classpath", "build/classes/java/main",
+                    "-Dplatform.includepath=${projectDir}/src/main/include",
+                    "-Dplatform.linkpath=${projectDir}/build/native/lib",
+                    "-d", "build/generated-src",
+                    "-o", "jnimxnet",
+                    "ai.djl.mxnet.javacpp.**"
+            ]
+        }
+    }
+}
+
+task parseCpp(type: JavaExec, dependsOn: "downloadLibmxnet") {
+    main "org.bytedeco.javacpp.tools.Builder"
+    classpath configurations.compileClasspath
+    workingDir "src/main/java"
+    args = [
+            "-Dplatform.includepath=../include",
+            "-d", "${projectDir}/build/generated-src",
+            "ai/djl/mxnet/javacpp/presets/mxnet.java"
+    ]
+
+    doLast {
+        file("${projectDir}/src/main/java/ai/djl/mxnet/javacpp/presets/mxnet.class").delete()
+    }
+}
+
+task downloadLibmxnet() {
+    doLast {
+        String osName = System.getProperty("os.name")
+        String path;
+        if (osName.startsWith("Win")) {
+            path = "win/mkl/libmxnet.dll.gz"
+        } else if (osName.startsWith("Mac")) {
+            path = "osx/mkl/libmxnet.dylib.gz"
+        } else if (osName.startsWith("Linux")) {
+            path = "linux/mkl/libmxnet.so.gz"
+        } else {
+            throw new GradleException("Unsupported os: " + osName)
+        }
+        def url = "https://djl-ai.s3.amazonaws.com/publish/mxnet-${VERSION}/${path}"
+
+        def file = new File("${projectDir}/build/native/lib/${System.mapLibraryName("mxnet")}")
+        if (!file.exists()) {
+            project.logger.lifecycle("Downloading ${url}")
+
+            file.getParentFile().mkdirs()
+            new URL("${url}").withInputStream { i -> file.withOutputStream { it << new GZIPInputStream(i) } }
+        }
+    }
+}

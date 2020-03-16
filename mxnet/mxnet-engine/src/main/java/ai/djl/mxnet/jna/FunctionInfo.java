@@ -14,22 +14,22 @@ package ai.djl.mxnet.jna;
 
 import ai.djl.mxnet.engine.MxNDArray;
 import ai.djl.mxnet.engine.MxNDManager;
+import ai.djl.mxnet.javacpp.AtomicSymbolCreator;
+import ai.djl.mxnet.javacpp.NDArrayHandle;
 import ai.djl.ndarray.NDArray;
-import ai.djl.ndarray.NDManager;
 import ai.djl.ndarray.types.SparseFormat;
 import ai.djl.util.PairList;
-import com.sun.jna.Pointer;
-import com.sun.jna.ptr.PointerByReference;
 import java.util.List;
 
 /** A FunctionInfo represents an operator (ie function) within the MXNet Engine. */
 public class FunctionInfo {
 
-    private Pointer handle;
+    private AtomicSymbolCreator handle;
     private String name;
     private PairList<String, String> arguments;
 
-    FunctionInfo(Pointer pointer, String functionName, PairList<String, String> arguments) {
+    FunctionInfo(
+            AtomicSymbolCreator pointer, String functionName, PairList<String, String> arguments) {
         this.handle = pointer;
         this.name = functionName;
         this.arguments = arguments;
@@ -43,13 +43,10 @@ public class FunctionInfo {
      * @param dest the destination NDArray(s) to be overwritten with the result of the operator
      * @param params the non-NDArray arguments to the operator. Should be a {@code PairList<String,
      *     String>}
-     * @return the error code or zero for no errors
      */
-    public int invoke(
-            NDManager manager, NDArray[] src, NDArray[] dest, PairList<String, ?> params) {
-        PointerArray srcHandles = JnaUtils.toPointerArray(src);
-        PointerByReference destRef = new PointerByReference(JnaUtils.toPointerArray(dest));
-        return JnaUtils.imperativeInvoke(handle, srcHandles, destRef, params).size();
+    public void invoke(
+            MxNDManager manager, NDArray[] src, NDArray[] dest, PairList<String, ?> params) {
+        JnaUtils.imperativeInvoke(handle, src, dest, params).size();
     }
 
     /**
@@ -61,25 +58,11 @@ public class FunctionInfo {
      *     String>}
      * @return the error code or zero for no errors
      */
-    public NDArray[] invoke(NDManager manager, NDArray[] src, PairList<String, ?> params) {
-        PointerArray srcHandles = JnaUtils.toPointerArray(src);
-        return invoke((MxNDManager) manager, srcHandles, params);
-    }
+    public NDArray[] invoke(MxNDManager manager, NDArray[] src, PairList<String, ?> params) {
+        NDArray[] dest = new NDArray[0];
 
-    /**
-     * Calls an operator with the given arguments.
-     *
-     * @param manager the manager to attach the result to
-     * @param src the input NDArray pointers to the operator
-     * @param params the non-NDArray arguments to the operator. Should be a {@code PairList<String,
-     *     String>}
-     * @return the error code or zero for no errors
-     */
-    private NDArray[] invoke(MxNDManager manager, PointerArray src, PairList<String, ?> params) {
-        PointerByReference destRef = new PointerByReference();
-
-        PairList<Pointer, SparseFormat> pairList =
-                JnaUtils.imperativeInvoke(handle, src, destRef, params);
+        PairList<NDArrayHandle, SparseFormat> pairList =
+                JnaUtils.imperativeInvoke(handle, src, dest, params);
         return pairList.stream()
                 .map(
                         pair -> {

@@ -12,9 +12,9 @@
  */
 package ai.djl.mxnet.jna;
 
+import ai.djl.mxnet.javacpp.global.mxnet;
 import ai.djl.util.Platform;
 import ai.djl.util.Utils;
-import com.sun.jna.Native;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -56,13 +56,6 @@ public final class LibUtils {
     private static final Pattern PATH_PATTERN = Pattern.compile("\\s*'(.+)',");
 
     private LibUtils() {}
-
-    public static MxnetLibrary loadLibrary() {
-        String libName = getLibName();
-        logger.debug("Loading mxnet library from: {}", libName);
-
-        return Native.load(libName, MxnetLibrary.class);
-    }
 
     public static String getLibName() {
         String libName = LibUtils.findOverrideLibrary();
@@ -146,6 +139,21 @@ public final class LibUtils {
 
         throw new IllegalStateException(
                 "Your MXNet native library jar does not match your operating system. Make sure that the Maven Dependency Classifier matches your system type.");
+    }
+
+    public static void copyJniFromClasspath(Path cacheDir) {
+        String name = System.mapLibraryName("jni" + LIB_NAME);
+        Path path = cacheDir.resolve(name);
+        if (Files.exists(path)) {
+            return;
+        }
+        String osPrefix = Platform.getSystemOsPrefix() + "-x86_64";
+        try (InputStream is =
+                mxnet.class.getResourceAsStream("/native/lib/osx-x86_64/libjnimxnet.dylib")) {
+            Files.copy(is, path);
+        } catch (IOException e) {
+            throw new IllegalStateException("Cannot copy jni files", e);
+        }
     }
 
     private static String loadLibraryFromClasspath(Platform platform) {

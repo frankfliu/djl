@@ -13,6 +13,7 @@
 package ai.djl.mxnet.engine;
 
 import ai.djl.Device;
+import ai.djl.mxnet.javacpp.NDArrayHandle;
 import ai.djl.mxnet.jna.JnaUtils;
 import ai.djl.mxnet.jna.NativeResource;
 import ai.djl.ndarray.NDArray;
@@ -27,8 +28,6 @@ import ai.djl.ndarray.internal.NDArrayEx;
 import ai.djl.ndarray.types.DataType;
 import ai.djl.ndarray.types.Shape;
 import ai.djl.ndarray.types.SparseFormat;
-import com.sun.jna.Native;
-import com.sun.jna.Pointer;
 import java.nio.Buffer;
 import java.nio.ByteBuffer;
 import java.nio.DoubleBuffer;
@@ -40,6 +39,8 @@ import java.util.List;
 import java.util.Stack;
 import java.util.function.Predicate;
 import java.util.stream.IntStream;
+import org.bytedeco.javacpp.BytePointer;
+import org.bytedeco.javacpp.Pointer;
 
 /** {@code MxNDArray} is the MXNet implementation of {@link NDArray}. */
 public class MxNDArray extends NativeResource implements NDArray {
@@ -70,7 +71,12 @@ public class MxNDArray extends NativeResource implements NDArray {
      * @param shape the shape of the new array
      * @param dataType the dataType of the new array
      */
-    MxNDArray(MxNDManager manager, Pointer handle, Device device, Shape shape, DataType dataType) {
+    MxNDArray(
+            MxNDManager manager,
+            NDArrayHandle handle,
+            Device device,
+            Shape shape,
+            DataType dataType) {
         this(manager, handle);
         this.device = device;
         // shape check
@@ -87,7 +93,7 @@ public class MxNDArray extends NativeResource implements NDArray {
      * @param manager the manager to attach the new array to
      * @param handle the pointer to the native MxNDArray memory
      */
-    MxNDArray(MxNDManager manager, Pointer handle) {
+    MxNDArray(MxNDManager manager, NDArrayHandle handle) {
         super(handle);
         this.manager = manager;
         this.mxNDArrayEx = new MxNDArrayEx(this);
@@ -100,7 +106,7 @@ public class MxNDArray extends NativeResource implements NDArray {
      * @param handle the pointer to the native MxNDArray memory
      * @param fmt the sparse format
      */
-    MxNDArray(MxNDManager manager, Pointer handle, SparseFormat fmt) {
+    MxNDArray(MxNDManager manager, NDArrayHandle handle, SparseFormat fmt) {
         this(manager, handle);
         this.sparseFormat = fmt;
     }
@@ -252,7 +258,7 @@ public class MxNDArray extends NativeResource implements NDArray {
     /** {@inheritDoc} */
     @Override
     public NDArray getGradient() {
-        Pointer pointer = JnaUtils.getGradient(getHandle());
+        NDArrayHandle pointer = JnaUtils.getGradient(getHandle());
         if (pointer == null) {
             throw new IllegalStateException(
                     "No gradient attached to this NDArray, please call array.attachGradient()"
@@ -269,8 +275,7 @@ public class MxNDArray extends NativeResource implements NDArray {
         long product = sh.size();
         long len = dType.getNumOfBytes() * product;
         ByteBuffer bb = manager.allocateDirect(Math.toIntExact(len));
-        Pointer pointer = Native.getDirectBufferPointer(bb);
-        JnaUtils.syncCopyToCPU(getHandle(), pointer, Math.toIntExact(product));
+        JnaUtils.syncCopyToCPU(getHandle(), bb, Math.toIntExact(product));
         return bb;
     }
 
@@ -283,36 +288,41 @@ public class MxNDArray extends NativeResource implements NDArray {
         validate(inputType, size);
 
         if (data.isDirect()) {
-            JnaUtils.syncCopyFromCPU(getHandle(), data, size);
+            JnaUtils.syncCopyFromCPU(getHandle(), new Pointer(data), size);
             return;
         }
 
         int numOfBytes = inputType.getNumOfBytes();
         ByteBuffer buf = manager.allocateDirect(size * numOfBytes);
+        Pointer pointer;
 
         switch (inputType) {
             case FLOAT32:
                 buf.asFloatBuffer().put((FloatBuffer) data);
+                pointer = new Pointer(buf);
                 break;
             case FLOAT64:
                 buf.asDoubleBuffer().put((DoubleBuffer) data);
+                pointer = new Pointer(buf);
                 break;
             case UINT8:
             case INT8:
             case BOOLEAN:
-                buf.put((ByteBuffer) data);
+                pointer = new BytePointer((ByteBuffer) data);
                 break;
             case INT32:
                 buf.asIntBuffer().put((IntBuffer) data);
+                pointer = new Pointer(buf);
                 break;
             case INT64:
                 buf.asLongBuffer().put((LongBuffer) data);
+                pointer = new Pointer(buf);
                 break;
             case FLOAT16:
             default:
                 throw new AssertionError("Show never happen");
         }
-        JnaUtils.syncCopyFromCPU(getHandle(), buf, size);
+        JnaUtils.syncCopyFromCPU(getHandle(), pointer, size);
     }
 
     /** {@inheritDoc} */
@@ -1631,6 +1641,12 @@ public class MxNDArray extends NativeResource implements NDArray {
 
     /** {@inheritDoc} */
     @Override
+    public NDArrayHandle getHandle() {
+        return (NDArrayHandle) super.getHandle();
+    }
+
+    /** {@inheritDoc} */
+    @Override
     public boolean equals(Object obj) {
         if (obj instanceof MxNDArray) {
             return contentEquals((MxNDArray) obj);
@@ -1659,7 +1675,7 @@ public class MxNDArray extends NativeResource implements NDArray {
         if (!shouldFree) {
             return;
         }
-        Pointer pointer = handle.getAndSet(null);
+        NDArrayHandle pointer = (NDArrayHandle) handle.getAndSet(null);
         if (pointer != null) {
             // TODO: remove after fixing multi-thread data loading issue
             // JnaUtils.waitToRead(pointer);

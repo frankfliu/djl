@@ -13,6 +13,7 @@
 package ai.djl.mxnet.engine;
 
 import ai.djl.Device;
+import ai.djl.mxnet.javacpp.CachedOpHandle;
 import ai.djl.mxnet.jna.JnaUtils;
 import ai.djl.mxnet.jna.NativeResource;
 import ai.djl.ndarray.NDArray;
@@ -22,7 +23,6 @@ import ai.djl.nn.Parameter;
 import ai.djl.training.ParameterStore;
 import ai.djl.util.Pair;
 import ai.djl.util.PairList;
-import com.sun.jna.Pointer;
 import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
@@ -61,7 +61,7 @@ public class CachedOp extends NativeResource {
      *     location
      */
     public CachedOp(
-            Pointer handle,
+            CachedOpHandle handle,
             MxNDManager manager,
             List<Parameter> parameters,
             List<Integer> paramIndices,
@@ -145,8 +145,14 @@ public class CachedOp extends NativeResource {
 
     /** {@inheritDoc} */
     @Override
+    public CachedOpHandle getHandle() {
+        return (CachedOpHandle) super.getHandle();
+    }
+
+    /** {@inheritDoc} */
+    @Override
     public void close() {
-        Pointer pointer = handle.getAndSet(null);
+        CachedOpHandle pointer = (CachedOpHandle) handle.getAndSet(null);
         if (pointer != null) {
             manager.detach(getUid());
             JnaUtils.freeCachedOp(pointer);

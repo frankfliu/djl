@@ -76,16 +76,7 @@ public final class Platform {
      */
     public static Platform fromSystem() {
         Platform platform = new Platform();
-        String osName = System.getProperty("os.name");
-        if (osName.startsWith("Win")) {
-            platform.osPrefix = "win";
-        } else if (osName.startsWith("Mac")) {
-            platform.osPrefix = "osx";
-        } else if (osName.startsWith("Linux")) {
-            platform.osPrefix = "linux";
-        } else {
-            throw new AssertionError("Unsupported platform: " + osName);
-        }
+        platform.osPrefix = getSystemOsPrefix();
         if (CudaUtils.getGpuCount() > 0) {
             platform.flavor = "cu" + CudaUtils.getCudaVersionString();
             platform.cudaArch = CudaUtils.getComputeCapability(0);
@@ -93,6 +84,19 @@ public final class Platform {
             platform.flavor = "";
         }
         return platform;
+    }
+
+    public static String getSystemOsPrefix() {
+        String osName = System.getProperty("os.name");
+        if (osName.startsWith("Win")) {
+            return "win";
+        } else if (osName.startsWith("Mac")) {
+            return "osx";
+        } else if (osName.startsWith("Linux")) {
+            return "linux";
+        } else {
+            throw new AssertionError("Unsupported platform: " + osName);
+        }
     }
 
     /**

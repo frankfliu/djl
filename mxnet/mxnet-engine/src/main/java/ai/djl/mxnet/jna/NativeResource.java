@@ -12,8 +12,8 @@
  */
 package ai.djl.mxnet.jna;
 
-import com.sun.jna.Pointer;
 import java.util.concurrent.atomic.AtomicReference;
+import org.bytedeco.javacpp.Pointer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,7 +31,7 @@ public abstract class NativeResource implements AutoCloseable {
 
     protected NativeResource(Pointer pointer) {
         this.handle = new AtomicReference<>(pointer);
-        uid = String.valueOf(Pointer.nativeValue(pointer));
+        uid = String.valueOf(pointer.address());
         if (logger.isTraceEnabled()) {
             exception = new Exception();
         }
