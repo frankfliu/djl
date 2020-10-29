@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <title>DJL Serving</title>
+
+    <link rel="icon" href="img/mdb-favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.11.2/css/all.css">
+    <link rel="stylesheet"
+          href="https://fonts.googleapis.com/css?family=Roboto:300,400,500,700&display=swap">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.0/css/bootstrap.min.css"
+          rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/mdbootstrap/4.19.1/css/mdb.min.css"
+          rel="stylesheet">
+</head>
+
+<link rel="stylesheet" href="css/style.css">
+<body>
+<div class="container">
+    <div class="card m-5" style="width: 50rem;">
+        <div class="card-body">
+            <h4 class="card-title">Load Model</h4>
+            <form>
+                <div class="form-group">
+                    <label for="modelUrl">Model URL</label>
+                    <input type="text" id="modelUrl" class="form-control mb-4"
+                           placeholder="Model URL">
+                </div>
+                <div class="form-group">
+                    <label for="modelApp">Application</label>
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            <select class="custom-select d-block w-100" id="modelApp">
+                                <option value="">Choose...</option>
+                                <option>CV</option>
+                                <option>NLP</option>
+                                <option>Tabular</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            <select class="custom-select d-block w-100" id="modelApp2">
+                                <option value="">Choose...</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="form-group col-md-6 mb-3">
+                        <label for="inputClass">Input</label>
+                        <input type="text" id="inputClass" class="form-control mb-4"
+                               placeholder="Input class name">
+                        <div class="invalid-feedback">
+                            Please select a valid Input.
+                        </div>
+                    </div>
+                    <div class="form-group col-md-6 mb-3">
+                        <label for="outputClass">Output</label>
+                        <input type="text" id="outputClass" class="form-control mb-4"
+                               placeholder="Output class name">
+                        <div class="invalid-feedback">
+                            Please select a valid Input.
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <h4 class="mb-3">Pre-processing</h4>
+                        <div class="form-group">
+                            <label>Image type</label>
+                            <div class="col">
+                                <div class="custom-control custom-radio">
+                                    <input id="color" name="imageType" type="radio"
+                                           class="custom-control-input" checked required>
+                                    <label class="custom-control-label" for="color">Color</label>
+                                </div>
+                                <div class="custom-control custom-radio">
+                                    <input id="greyscale" name="imageType" type="radio"
+                                           class="custom-control-input" required>
+                                    <label class="custom-control-label"
+                                           for="greyscale">Greyscale</label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="centerCrop">
+                            <label class="form-check-label" for="centerCrop">Center Crop</label>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="resize">
+                            <label class="form-check-label" for="resize">Resize</label>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group col-md-4">
+                                <input type="text" id="resizeWidth" class="form-control"
+                                       placeholder="width">
+                            </div>
+                            <div class="form-group col-md-4">
+                                <input type="text" id="resizeHeight" class="form-control"
+                                       placeholder="height">
+                            </div>
+                        </div>
+
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="normalize">
+                            <label class="form-check-label" for="normalize">Normalize</label>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group col-md-8">
+                                <input type="text" id="mean" class="form-control"
+                                       placeholder="mean,std">
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <label for="range">Adjust range</label>
+                            <select class="custom-select d-block w-100" id="range">
+                                <option value="">N/A</option>
+                                <option>0, 1</option>
+                                <option>-1, 1</option>
+                            </select>
+                        </div>
+
+                    </div>
+                    <div class="col-md-6">
+                        <h4>Post-processing</h4>
+                        <div class="form-group">
+                            <label for="threshold">Threshold</label>
+                            <input type="text" id="threshold" class="form-control"
+                                   placeholder="0.2">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="synset">Synset</label>
+                            <input type="text" id="synset" class="form-control"
+                                   placeholder="synsetUrl or comma seperated classes">
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="rescale">
+                            <label class="form-check-label" for="rescale">Rescale</label>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group col-md-4">
+                                <input type="text" id="rescaleWidth" class="form-control"
+                                       placeholder="width">
+                            </div>
+                            <div class="form-group col-md-4">
+                                <input type="text" id="rescaleHeight" class="form-control"
+                                       placeholder="height">
+                            </div>
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" class="form-check-input" id="softmax">
+                            <label class="form-check-label" for="softmax">Apply softmax</label>
+                        </div>
+                    </div>
+                </div>
+                <button type="submit" class="btn btn-primary">Submit</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script type="text/javascript"
+        src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+<script type="text/javascript"
+        src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.14.4/umd/popper.min.js"></script>
+<script type="text/javascript"
+        src="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.5.0/js/bootstrap.min.js"></script>
+<script type="text/javascript"
+        src="https://cdnjs.cloudflare.com/ajax/libs/mdbootstrap/4.19.1/js/mdb.min.js"></script>
+
+<script type="text/javascript" src="js/app.js"></script>
+
+<script type="text/javascript"></script>
+
+</body>
+</html>
