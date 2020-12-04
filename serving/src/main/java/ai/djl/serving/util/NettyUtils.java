@@ -14,6 +14,7 @@ package ai.djl.serving.util;
 
 import ai.djl.ModelException;
 import ai.djl.modality.Input;
+import ai.djl.modality.Output;
 import ai.djl.repository.zoo.ModelNotFoundException;
 import ai.djl.serving.http.BadRequestException;
 import ai.djl.serving.http.ErrorResponse;
@@ -47,6 +48,7 @@ import java.io.IOException;
 import java.net.SocketAddress;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -142,6 +144,25 @@ public final class NettyUtils {
         content.writeCharSequence(json, CharsetUtil.UTF_8);
         content.writeByte('\n');
         sendHttpResponse(ctx, resp, true);
+    }
+
+    public static void sendFullResponse(ChannelHandlerContext ctx, Output output) {
+        FullHttpResponse resp =
+                new DefaultFullHttpResponse(HttpVersion.HTTP_1_1, HttpResponseStatus.OK, false);
+        for (Map.Entry<String, String> entry : output.getProperties().entrySet()) {
+            resp.headers().set(entry.getKey(), entry.getValue());
+        }
+        resp.content().writeBytes(output.getContent());
+
+        /*
+         * We can load the models based on the configuration file.Since this Job is
+         * not driven by the external connections, we could have a empty context for
+         * this job. We shouldn't try to send a response to ctx if this is not triggered
+         * by external clients.
+         */
+        if (ctx != null) {
+            NettyUtils.sendHttpResponse(ctx, resp, true);
+        }
     }
 
     /**

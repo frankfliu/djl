@@ -12,11 +12,16 @@
  */
 package ai.djl.serving;
 
+import ai.djl.serving.execution.ModelLoadService;
+import ai.djl.serving.execution.PredictionService;
 import ai.djl.serving.http.InferenceRequestHandler;
+import ai.djl.serving.http.InterferencePredictionRequestHandler;
 import ai.djl.serving.http.InvalidRequestHandler;
 import ai.djl.serving.http.ManagementRequestHandler;
 import ai.djl.serving.util.ConfigManager;
 import ai.djl.serving.util.Connector;
+import ai.djl.serving.wlm.ModelManager;
+import ai.djl.serving.wlm.WorkLoadManager;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
@@ -55,17 +60,27 @@ public class ServerInitializer extends ChannelInitializer<Channel> {
         }
         pipeline.addLast("http", new HttpServerCodec());
         pipeline.addLast("aggregator", new HttpObjectAggregator(maxRequestSize, true));
+
+        WorkLoadManager executorProvider = ModelManager.getInstance().getExecutorProvider();
+        ModelLoadService modelLoadService = new ModelLoadService();
+        PredictionService predictionService =
+                new PredictionService(executorProvider, modelLoadService);
+
         switch (connectorType) {
             case MANAGEMENT:
                 pipeline.addLast("management", new ManagementRequestHandler());
                 break;
             case INFERENCE:
-                pipeline.addLast("inference", new InferenceRequestHandler());
+                pipeline.addLast("inference", new InferenceRequestHandler(predictionService));
+                pipeline.addLast(
+                        "prediction", new InterferencePredictionRequestHandler(predictionService));
                 break;
             case BOTH:
             default:
-                pipeline.addLast("inference", new InferenceRequestHandler());
+                pipeline.addLast("inference", new InferenceRequestHandler(predictionService));
                 pipeline.addLast("management", new ManagementRequestHandler());
+                pipeline.addLast(
+                        "prediction", new InterferencePredictionRequestHandler(predictionService));
                 break;
         }
         pipeline.addLast("badRequest", new InvalidRequestHandler());

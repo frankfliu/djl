@@ -18,6 +18,7 @@ import ai.djl.serving.util.Connector;
 import ai.djl.serving.util.ServerGroups;
 import ai.djl.serving.wlm.ModelInfo;
 import ai.djl.serving.wlm.ModelManager;
+import ai.djl.serving.wlm.WorkLoadManager;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.ChannelFuture;
 import io.netty.channel.ChannelFutureListener;
@@ -244,7 +245,7 @@ public class ModelServer {
     }
 
     private void initModelStore() throws IOException {
-        ModelManager.init(configManager);
+        ModelManager.init(configManager, new WorkLoadManager());
         Set<String> startupModels = ModelManager.getInstance().getStartupModels();
 
         String loadModels = configManager.getLoadModels();

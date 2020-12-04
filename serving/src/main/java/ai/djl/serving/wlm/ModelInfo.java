@@ -16,10 +16,7 @@ import ai.djl.modality.Input;
 import ai.djl.modality.Output;
 import ai.djl.repository.zoo.ZooModel;
 import java.nio.file.Path;
-import java.util.List;
-import java.util.concurrent.LinkedBlockingDeque;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.locks.ReentrantLock;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -35,9 +32,10 @@ public class ModelInfo implements AutoCloseable {
     private int maxWorkers;
     private int batchSize;
     private int maxBatchDelay;
-    private ReentrantLock lock;
 
-    private LinkedBlockingDeque<Job> jobs;
+    private AtomicInteger queued;
+    private AtomicInteger running;
+    //   private ReentrantLock lock;
 
     private ZooModel<Input, Output> model;
 
@@ -56,8 +54,9 @@ public class ModelInfo implements AutoCloseable {
         this.model = model;
         batchSize = 1;
         maxBatchDelay = 100;
-        jobs = new LinkedBlockingDeque<>(queueSize);
-        lock = new ReentrantLock();
+        queued = new AtomicInteger();
+        running = new AtomicInteger();
+        //       lock = new ReentrantLock();
     }
 
     /**
@@ -169,44 +168,55 @@ public class ModelInfo implements AutoCloseable {
     }
 
     /**
-     * Adds a job to the queue.
-     *
-     * @param job an inference job
-     * @return {@code true} if the queue is full
-     */
-    public boolean addJob(Job job) {
-        return jobs.offer(job);
-    }
-
-    /**
      * Fills in the list with a batch of jobs.
      *
      * @param list the batch queue to be filled
      * @throws InterruptedException if interrupted
      */
-    public void pollBatch(List<Job> list) throws InterruptedException {
-        try {
-            lock.lockInterruptibly();
-            Job job = jobs.take();
-            logger.trace("get first job: {}", job.getRequestId());
+    //    public void pollBatch(List<Job> list) throws InterruptedException {
+    //        try {
+    //            lock.lockInterruptibly();
+    //            Job job = jobs.take();
+    //            logger.trace("get first job: {}", job.getRequestId());
+    //
+    //            list.add(job);
+    //            long begin = System.currentTimeMillis();
+    //            long maxDelay = maxBatchDelay;
+    //            for (int i = 0; i < batchSize - 1 && maxDelay > 0; ++i) {
+    //                job = jobs.poll(maxDelay, TimeUnit.MILLISECONDS);
+    //                if (job == null) {
+    //                    break;
+    //                }
+    //                long end = System.currentTimeMillis();
+    //                maxDelay -= end - begin;
+    //                begin = end;
+    //                list.add(job);
+    //            }
+    //            logger.trace("sending jobs, size: {}", list.size());
+    //        } finally {
+    //            lock.unlock();
+    //        }
+    //    }
 
-            list.add(job);
-            long begin = System.currentTimeMillis();
-            long maxDelay = maxBatchDelay;
-            for (int i = 0; i < batchSize - 1 && maxDelay > 0; ++i) {
-                job = jobs.poll(maxDelay, TimeUnit.MILLISECONDS);
-                if (job == null) {
-                    break;
-                }
-                long end = System.currentTimeMillis();
-                maxDelay -= end - begin;
-                begin = end;
-                list.add(job);
-            }
-            logger.trace("sending jobs, size: {}", list.size());
-        } finally {
-            lock.unlock();
-        }
+    public ModelInfo queued() {
+        queued.incrementAndGet();
+        return this;
+    }
+
+    public ModelInfo running() {
+        running.incrementAndGet();
+        return this;
+    }
+
+    public ModelInfo finished() {
+        queued.decrementAndGet();
+        running.decrementAndGet();
+        return this;
+    }
+
+    public ModelInfo abort() {
+        queued.decrementAndGet();
+        return this;
     }
 
     /** {@inheritDoc} */
@@ -215,5 +225,13 @@ public class ModelInfo implements AutoCloseable {
         if (model != null) {
             model.close();
         }
+    }
+
+    public int getRunningJobsCount() {
+        return running.get();
+    }
+
+    public int getQueuedCount() {
+        return queued.get();
     }
 }

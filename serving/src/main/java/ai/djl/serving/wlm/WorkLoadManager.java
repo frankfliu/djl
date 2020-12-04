@@ -1,119 +1,48 @@
-/*
- * Copyright 2020 Amazon.com, Inc. or its affiliates. All Rights Reserved.
- *
- * Licensed under the Apache License, Version 2.0 (the "License"). You may not use this file except in compliance
- * with the License. A copy of the License is located at
- *
- * http://aws.amazon.com/apache2.0/
- *
- * or in the "license" file accompanying this file. This file is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES
- * OR CONDITIONS OF ANY KIND, either express or implied. See the License for the specific language governing permissions
- * and limitations under the License.
- */
 package ai.djl.serving.wlm;
 
-import ai.djl.serving.util.ConfigManager;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.SynchronousQueue;
+import java.util.concurrent.ThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
-class WorkLoadManager {
+public class WorkLoadManager {
 
-    private ConfigManager configManager;
-    private AtomicInteger gpuCounter;
-    private ExecutorService threadPool;
-    private ConcurrentHashMap<String, List<WorkerThread>> workers;
+    private Executor defaultPredictionExecutor;
+    private Map<String, ExecutorService> specialisedPredictionExecutor;
 
-    public WorkLoadManager(ConfigManager configManager) {
-        this.configManager = configManager;
-        this.gpuCounter = new AtomicInteger(0);
-        threadPool = Executors.newCachedThreadPool();
-        workers = new ConcurrentHashMap<>();
+    public WorkLoadManager() {
+        specialisedPredictionExecutor = new ConcurrentHashMap<>();
+        defaultPredictionExecutor =
+                new ThreadPoolExecutor(
+                        0, 5, 10L, TimeUnit.SECONDS, new SynchronousQueue<Runnable>());
     }
 
-    public List<WorkerThread> getWorkers(String modelName) {
-        List<WorkerThread> list = workers.get(modelName);
-        if (list == null) {
-            return Collections.emptyList();
-        }
-        return list;
-    }
-
-    public boolean hasWorker(String modelName) {
-        List<WorkerThread> worker = workers.get(modelName);
-        if (worker == null || worker.isEmpty()) {
-            return false;
-        }
-        for (WorkerThread thread : worker) {
-            if (thread.isRunning()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public int getNumRunningWorkers(String modelName) {
-        int numWorking = 0;
-        List<WorkerThread> threads = workers.get(modelName);
-        if (threads != null) {
-            for (WorkerThread thread : threads) {
-                if ((thread.getState() != WorkerState.WORKER_STOPPED)
-                        && (thread.getState() != WorkerState.WORKER_ERROR)
-                        && (thread.getState() != WorkerState.WORKER_SCALED_DOWN)) {
-                    ++numWorking;
-                }
-            }
-        }
-        return numWorking;
-    }
-
-    public void modelChanged(ModelInfo modelInfo) {
-        synchronized (modelInfo.getModelName()) {
-            int minWorker = modelInfo.getMinWorkers();
-            int maxWorker = modelInfo.getMaxWorkers();
-            List<WorkerThread> threads;
-            if (minWorker == 0) {
-                threads = workers.remove(modelInfo.getModelName());
-                if (threads == null) {
-                    return;
-                }
-            } else {
-                threads = workers.computeIfAbsent(modelInfo.getModelName(), k -> new ArrayList<>());
-            }
-
-            int currentWorkers = threads.size();
-            if (currentWorkers < minWorker) {
-                addThreads(threads, modelInfo, minWorker - currentWorkers);
-            } else {
-                for (int i = currentWorkers - 1; i >= maxWorker; --i) {
-                    WorkerThread thread = threads.remove(i);
-                    thread.shutdown(WorkerState.WORKER_SCALED_DOWN);
-                }
-            }
+    public Executor getPredictionExecutor(String modelName) {
+        if (specialisedPredictionExecutor.containsKey(modelName)) {
+            return specialisedPredictionExecutor.get(modelName);
+        } else {
+            return defaultPredictionExecutor;
         }
     }
 
-    public void scheduleAsync(Runnable r) {
-        threadPool.execute(r);
+    public void registerSpecialisedExecutorForModel(ModelInfo model) {
+        if (specialisedPredictionExecutor.containsKey(model.getModelName())) {
+            specialisedPredictionExecutor.get(model.getModelName()).shutdown();
+        }
+        specialisedPredictionExecutor.put(
+                model.getModelName(),
+                new ThreadPoolExecutor(
+                        model.getMinWorkers(),
+                        model.getMaxWorkers(),
+                        model.getMaxBatchDelay(),
+                        TimeUnit.SECONDS,
+                        new SynchronousQueue<Runnable>()));
     }
 
-    private void addThreads(List<WorkerThread> threads, ModelInfo model, int count) {
-        int maxGpu = configManager.getNumberOfGpu();
-        for (int i = 0; i < count; ++i) {
-            int gpuId = -1;
-
-            if (maxGpu > 0) {
-                gpuId = gpuCounter.accumulateAndGet(maxGpu, (prev, maxGpuId) -> ++prev % maxGpuId);
-            }
-
-            BatchAggregator aggregator = new BatchAggregator(model);
-            WorkerThread thread = new WorkerThread(gpuId, model, aggregator);
-            threads.add(thread);
-            threadPool.submit(thread);
-        }
+    public void unregisterSpecialisedExecutorForModel(ModelInfo model) {
+        specialisedPredictionExecutor.remove(model.getModelName());
     }
 }
