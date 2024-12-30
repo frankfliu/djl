@@ -18,7 +18,7 @@ from argparse import Namespace
 
 import onnx
 from torch import nn
-from transformers.modeling_outputs import TokenClassifierOutput
+from transformers.modeling_outputs import TokenClassifierOutput, Seq2SeqSequenceClassifierOutput
 
 from djl_converter.safetensors_convert import convert_file
 import torch
@@ -58,8 +58,10 @@ class ModelWrapper(nn.Module):
             output = self.model(input_ids, attention_mask)
         else:
             output = self.model(input_ids, attention_mask, token_type_ids)
-        if isinstance(output, TokenClassifierOutput):
-            # TokenClassifierOutput may contains mix of Tensor and Tuple(Tensor)
+        if isinstance(output, TokenClassifierOutput) or isinstance(
+                output, Seq2SeqSequenceClassifierOutput):
+            # TokenClassifierOutput/Seq2SeqSequenceClassifierOutput
+            # may contains mix of Tensor and Tuple(Tensor)
             return {"logits": output["logits"]}
 
         return output
@@ -303,14 +305,13 @@ class HuggingfaceConverter:
 
         # noinspection PyBroadException
         try:
+            wrapper = ModelWrapper(hf_pipeline.model, include_types)
             if include_types:
                 script_module = torch.jit.trace(
-                    ModelWrapper(hf_pipeline.model, include_types),
-                    (input_ids, attention_mask, token_type_ids),
+                    wrapper, (input_ids, attention_mask, token_type_ids),
                     strict=False)
             else:
-                script_module = torch.jit.trace(ModelWrapper(
-                    hf_pipeline.model, include_types),
+                script_module = torch.jit.trace(wrapper,
                                                 (input_ids, attention_mask),
                                                 strict=False)
 
