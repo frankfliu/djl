@@ -9,7 +9,6 @@ permissions:
 
 jobs:
   build-pytorch-jni-linux:
-    if: github.repository == 'deepjavalibrary/djl'
     runs-on: ubuntu-latest
     container: nvidia/cuda:12.8.1-devel-ubuntu22.04
     steps:
@@ -31,19 +30,8 @@ jobs:
         run: |
           cd engines/onnxruntime/onnxruntime-engine
           ./build_ort_genai.sh CUDA
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::425969335547:role/djl-ci-publish-role
-          aws-region: us-east-2
-      - name: Copy files to S3 with the AWS CLI
-        run: |
-          export ORT_GENAI_VERSION=$(awk -F '=' '/onnxruntimeGenai/ {gsub(/ ?"/, "", $2); print $2}' gradle/libs.versions.toml)
-          aws s3 sync engines/onnxruntime/onnxruntime-engine/native s3://djl-ai/publish/onnxruntime-genai/${ORT_GENAI_VERSION}/
-          aws cloudfront create-invalidation --distribution-id E371VB8JQ6NRVY --paths "/onnxruntime-genai/${ORT_GENAI_VERSION}/*"
 
   build-pytorch-jni-windows:
-    if: github.repository == 'deepjavalibrary/djl'
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -72,45 +60,3 @@ jobs:
         shell: bash
         run: |
           engines/onnxruntime/onnxruntime-engine/build_ort_genai.sh
-      - name: Configure Deployment AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::425969335547:role/djl-ci-publish-role
-          aws-region: us-east-2
-      - name: Copy files to S3 with the AWS CLI
-        shell: bash
-        run: |
-          export ORT_GENAI_VERSION=$(awk -F '=' '/onnxruntimeGenai/ {gsub(/ ?"/, "", $2); print $2}' gradle/libs.versions.toml)
-          aws s3 sync engines/onnxruntime/onnxruntime-engine/native s3://djl-ai/publish/onnxruntime-genai/${ORT_GENAI_VERSION}/
-          aws cloudfront create-invalidation --distribution-id E371VB8JQ6NRVY --paths "/onnxruntime-genai/${ORT_GENAI_VERSION}/*"
-
-  build-pytorch-jni-arm64-macos:
-    if: github.repository == 'deepjavalibrary/djl'
-    runs-on: macos-latest-xlarge
-    steps:
-      - uses: actions/checkout@v4
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: 17
-          distribution: corretto
-          architecture: aarch64
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.11.x'
-      - name: Build JNI
-        shell: bash
-        run: |
-          cd engines/onnxruntime/onnxruntime-engine
-          ./build_ort_genai.sh
-      - name: Configure Deployment AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: arn:aws:iam::425969335547:role/djl-ci-publish-role
-          aws-region: us-east-2
-      - name: Copy files to S3 with the AWS CLI
-        shell: bash
-        run: |
-          export ORT_GENAI_VERSION=$(awk -F '=' '/onnxruntimeGenai/ {gsub(/ ?"/, "", $2); print $2}' gradle/libs.versions.toml)
-          aws s3 sync engines/onnxruntime/onnxruntime-engine/native s3://djl-ai/publish/onnxruntime-genai/${ORT_GENAI_VERSION}/
-          aws cloudfront create-invalidation --distribution-id E371VB8JQ6NRVY --paths "/onnxruntime-genai/${ORT_GENAI_VERSION}/*"
