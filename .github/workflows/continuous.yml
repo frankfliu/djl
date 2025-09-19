@@ -22,7 +22,6 @@ on:
 
 jobs:
   build:
-    if: github.repository == 'deepjavalibrary/djl'
     runs-on: ${{ matrix.operating-system }}
     strategy:
       fail-fast: false
