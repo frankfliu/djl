@@ -112,8 +112,8 @@ jobs:
       - name: Release cuda11 JNI
         shell: cmd
         run: |
-          gradlew :engines:pytorch:pytorch-native:cleanJNI
           rm.exe -Rf engines/pytorch/pytorch-native/libtorch
+          rm.exe -Rf engines/pytorch/pytorch-native/build
           call "C:\Program Files\Microsoft Visual Studio\2022\Enterprise\VC\Auxiliary\Build\vcvarsall.bat" amd64
           set "CUDA_PATH=%ProgramFiles%\NVIDIA GPU Computing Toolkit\CUDA\v11.7"
           set "PATH=%CUDA_PATH%\bin;%CUDA_PATH%\libnvvp;%PATH%"
